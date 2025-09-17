@@ -1,0 +1,7 @@
+title = "EVO data converters"
+[extend]
+useDefault = true
+
+[[rules]]
+id = "no-user-paths"
+regex = '''/home/([a-z0-9]+)/'''
