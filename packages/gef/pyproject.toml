@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/SeequentEvo/evo-python-sdk"
-Tracker = "https://github.com/SeequentEvo/evo-python-sdk/issues"
+Source = "https://github.com/SeequentEvo/evo-data-converters"
+Tracker = "https://github.com/SeequentEvo/evo-data-converters/issues"
 Homepage = "https://www.seequent.com/"
 Documentation = "https://developer.seequent.com/"
 
@@ -50,10 +50,10 @@ path = "README.md"
 # Literal TOML strings (single quotes) need no escaping of backslashes.
 # Converts relative images to absolute links in PyPI
 pattern = '!\[(.+?)\]\(((?!https?://)\S+?\.(?:jpe?g|png|gif))\)'
-replacement = '![\1](https://github.com/SeequentEvo/evo-data-converters/raw/main/packages/omf/\g<2>)'
+replacement = '![\1](https://github.com/SeequentEvo/evo-data-converters/raw/main/packages/gef/\g<2>)'
 
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
 # Literal TOML strings (single quotes) need no escaping of backslashes.
 # Converts relative links to absolute links in PyPI
 pattern = '\[(.+?)\]\(((?!https?://)\S+?)\)'
-replacement = '[\1](https://github.com/SeequentEvo/evo-data-converters/tree/main/packages/omf/\g<2>)'
+replacement = '[\1](https://github.com/SeequentEvo/evo-data-converters/tree/main/packages/gef/\g<2>)'
