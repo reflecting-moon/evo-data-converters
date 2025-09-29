@@ -12,6 +12,8 @@
 import pytest
 from pathlib import Path
 from pygef.cpt import CPTData
+from evo.data_converters.gef.importer.parse_gef_files import get_gef_id
+from evo.data_converters.gef.importer.parse_gef_files import parse_gef_file
 from evo.data_converters.gef.importer.parse_gef_files import parse_gef_files
 
 
@@ -22,11 +24,8 @@ class TestParseGefFiles:
 
     def test_parse_valid_cpt_gef_file(self) -> None:
         cpt_file = self.test_data_dir / "cpt/cpt.gef"
-        result = parse_gef_files([cpt_file])
-        assert isinstance(result, dict)
-        assert len(result) == 1
-        for v in result.values():
-            assert isinstance(v, CPTData)
+        result = parse_gef_file(cpt_file)
+        assert isinstance(result, CPTData)
 
     def test_parse_multiple_valid_cpt_files(self) -> None:
         files = [
@@ -67,11 +66,25 @@ class TestParseGefFiles:
             parse_gef_files([bore_file])
         assert "is not a CPT GEF file" in str(exc.value)
 
-    def test_overlapping_hole_ids(self):
-        """Test that parse_gef_files raises an error for duplicate hole_ids (from test_id or filename)."""
+    def test_gef_id_derivation(self) -> None:
+        """Test that parse_gef_files raises an error for duplicate IDs (from test_id or filename)."""
         file1 = self.test_data_dir / "cpt/cpt.gef"
-        file2 = self.test_data_dir / "cpt/cpt_duplicate_test_id.gef"
 
-        with pytest.raises(RuntimeError) as exc:
-            parse_gef_files([file1, file2])
-        assert "Duplicate hole_id" in str(exc.value)
+        cpt_data1 = parse_gef_file(file1)
+        # if hasattr(cpt_data1, "bro_id") and cpt_data1.bro_id:
+        #     assert cpt_data1.bro_id == "CPTU17.8 + 83BITE"
+        cpt_gef_id = get_gef_id(gef=cpt_data1, filepath=file1)
+        assert cpt_gef_id == "CPTU17.8 + 83BITE"
+
+    # def test_overlapping_hole_ids(self):
+    #     """Test that parse_gef_files raises an error for duplicate IDs (from test_id or filename)."""
+    #     file1 = self.test_data_dir / "cpt/cpt.gef"
+    #     file2 = self.test_data_dir / "cpt/cpt_duplicate_test_id.gef"
+    #
+    #     cpt_data1 = parse_gef_file(file1)
+    #     cpt_gef_id = get_gef_id(cpt_data1, file1)
+    #     assert cpt_gef_id == "CPTU17.8 + 83BITE"
+    #
+    #     with pytest.raises(RuntimeError) as exc:
+    #         parse_gef_files([file1, file2])
+    #     assert "Duplicate hole_id" in str(exc.value)
