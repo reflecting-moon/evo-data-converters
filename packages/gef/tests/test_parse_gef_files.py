@@ -35,6 +35,8 @@ class TestParseGefFiles:
             self.test_data_dir / "gef-xml/cpt.xml",
         ]
         result = parse_gef_files(files)
+        assert isinstance(result, dict)
+
         assert len(result) == 3
         for v in result.values():
             assert isinstance(v, CPTData)
@@ -80,4 +82,4 @@ class TestParseGefFiles:
 
         with pytest.raises(RuntimeError) as exc:
             parse_gef_files([file1, file2])
-        assert "Duplicate hole_id" in str(exc.value)
+        assert "Duplicate ID" in str(exc.value)
