@@ -83,7 +83,7 @@ def parse_gef_files(filepaths: list[str | Path]) -> dict[str, CPTData]:
             for cpt_data in file_result:
                 cpt_id = get_gef_cpt_id(cpt_data)
                 if cpt_id in data:
-                    raise ValueError(
+                    raise RuntimeError(
                         f"Duplicate ID '{cpt_id}' encountered. Each ID (from test_id, bro_id, or filename) must be unique across all input files."
                     )
                 data[cpt_id] = cpt_data
