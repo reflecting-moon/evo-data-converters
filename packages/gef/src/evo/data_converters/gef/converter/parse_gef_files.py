@@ -20,16 +20,17 @@ from pygef.cpt import CPTData
 logger = evo.logging.getLogger("data_converters")
 
 
-def parse_gef_file(filepath: str | Path, replace_column_voids=False) -> list[CPTData]:
+def parse_gef_file(filepath: str | Path, replace_column_voids=False, remove_pre_excavated_rows=True) -> list[CPTData]:
     """
     Parse a single GEF-CPT or GEF-XML file.
-    Args:
-        filepath (str | Path): Path to the file to parse.
 
-    Returns:
-        list[CPTData]:
-            .gef files contain a single CPTData object.
-            .xml files may contain multiple CPTData objects.
+    :param filepath (str | Path): Path to the file to parse.
+    :param replace_column_voids: (Optional, default False) Remove or interpolate rows with void values.
+    :param remove_pre_excavated_rows: (Optional, default True) Remove data above GEF pre-excavated depth value.
+
+    :return list[CPTData]:
+        .gef files contain a single CPTData object.
+        .xml files may contain multiple CPTData objects.
     """
     try:
         if not Path(filepath).exists():
@@ -49,7 +50,11 @@ def parse_gef_file(filepath: str | Path, replace_column_voids=False) -> list[CPT
             return multiple_cpt_data
 
         elif ext == ".gef":
-            cpt_data = read_cpt(filepath, replace_column_voids=replace_column_voids)
+            cpt_data = read_cpt(
+                filepath,
+                replace_column_voids=replace_column_voids,
+                remove_pre_excavated_rows=remove_pre_excavated_rows,
+            )
             # GEF test ID is in alias.
             # https://github.com/cemsbv/pygef/blob/6002e174b154a6ef7726f7a3aa467d6ada22be92/src/pygef/shim.py#L106
             check_for_required_columns(cpt_data, filepath)
@@ -66,7 +71,11 @@ def parse_gef_file(filepath: str | Path, replace_column_voids=False) -> list[CPT
         raise RuntimeError(f"Error processing file '{filepath}': {e}") from e
 
 
-def parse_gef_files(filepaths: list[str | Path], replace_column_voids=False) -> dict[str, CPTData]:
+def parse_gef_files(
+    filepaths: list[str | Path],
+    replace_column_voids=False,
+    remove_pre_excavated_rows=True,
+) -> dict[str, CPTData]:
     """
     Parse a list of GEF-CPT & GEF-XML files and return a dictionary of CPTData objects keyed by filename.
 
@@ -74,6 +83,8 @@ def parse_gef_files(filepaths: list[str | Path], replace_column_voids=False) -> 
 
     Args:
         filepaths (list[str | Path]): List of file paths to parse.
+        replace_column_voids (boolean): Pygef option to replace void values with interpolated values.
+        remove_pre_excavated_rows (boolean): Pygef option to replace void values with interpolated values.
 
     Returns:
         dict[str, CPTData]: Dictionary mapping each CPT file's filename to its CPTData object.
@@ -83,7 +94,11 @@ def parse_gef_files(filepaths: list[str | Path], replace_column_voids=False) -> 
     for filepath in filepaths:
         try:
             # Get list of CPT in the GEF file, copy to data dict.
-            file_result = parse_gef_file(filepath, replace_column_voids=replace_column_voids)
+            file_result = parse_gef_file(
+                filepath,
+                replace_column_voids=replace_column_voids,
+                remove_pre_excavated_rows=remove_pre_excavated_rows,
+            )
             for cpt_data in file_result:
                 cpt_id = get_gef_cpt_id(cpt_data)
                 if cpt_id in data:

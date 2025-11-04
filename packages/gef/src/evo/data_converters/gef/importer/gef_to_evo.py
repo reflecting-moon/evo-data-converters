@@ -40,6 +40,7 @@ def convert_gef(
     tags: dict[str, str] | None = None,
     upload_path: str = "",
     overwrite_existing_objects: bool = False,
+    remove_pre_excavated_rows: bool = True,
 ) -> DownholeCollection | list[ObjectMetadata] | None:
     """Converts a collection of GEF-CPT files into a Downhole Collection Geoscience Object.
 
@@ -49,6 +50,7 @@ def convert_gef(
     :param tags: (Optional) Dict of tags to add to the Geoscience Object.
     :param upload_path: (Optional) Path object will be published under.
     :param overwrite_existing_objects: (Optional) Whether existing objects will be overwritten with a new version.
+    :param remove_pre_excavated_rows: (Optional, default True) Remove data above GEF pre-excavated depth value.
 
     One of evo_workspace_metadata or service_manager_widget is required.
 
@@ -70,7 +72,7 @@ def convert_gef(
         logger.debug("Publishing will be skipped due to missing hub_url.")
         publish_object = False
 
-    gef_cpt_data = parse_gef_files(filepaths)
+    gef_cpt_data = parse_gef_files(filepaths, remove_pre_excavated_rows=remove_pre_excavated_rows)
     downhole_collection = create_from_parsed_gef_cpts(gef_cpt_data)
     converter = DownholeCollectionToGeoscienceObject(dhc=downhole_collection, data_client=data_client)
     geoscience_object = converter.convert()
