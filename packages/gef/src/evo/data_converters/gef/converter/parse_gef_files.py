@@ -24,13 +24,10 @@ def parse_gef_file(filepath: str | Path, replace_column_voids=False, remove_pre_
     """
     Parse a single GEF-CPT or GEF-XML file.
 
-    :param filepath (str | Path): Path to the file to parse.
-    :param replace_column_voids: (Optional, default False) Remove or interpolate rows with void values.
-    :param remove_pre_excavated_rows: (Optional, default True) Remove data above GEF pre-excavated depth value.
-
-    :return list[CPTData]:
-        .gef files contain a single CPTData object.
-        .xml files may contain multiple CPTData objects.
+    :param filepath: str or Path. Path to the file to parse.
+    :param replace_column_voids: Boolean, Pygef option to replace void values with interpolated values.
+    :param remove_pre_excavated_rows: Boolean, Pygef option to replace void values with interpolated values.
+    :returns: list[CPTData] Parsed results, .gef files a single CPTData, .xml files may contain & return multiple.
     """
     try:
         if not Path(filepath).exists():
@@ -81,13 +78,10 @@ def parse_gef_files(
 
     Only files identified as CPT (Cone Penetration Test) are read and included.
 
-    Args:
-        filepaths (list[str | Path]): List of file paths to parse.
-        replace_column_voids (boolean): Pygef option to replace void values with interpolated values.
-        remove_pre_excavated_rows (boolean): Pygef option to replace void values with interpolated values.
-
-    Returns:
-        dict[str, CPTData]: Dictionary mapping each CPT file's filename to its CPTData object.
+    :param filepaths: list[str or Path]: List of file paths to parse.
+    :param replace_column_voids: Boolean, Pygef option to replace void values with interpolated values.
+    :param remove_pre_excavated_rows: Boolean, Pygef option to replace void values with interpolated values.
+    :return dict[str, CPTData]: Dictionary mapping each CPT file's filename to its CPTData object.
     """
     data: dict[str, CPTData] = {}
 
@@ -122,12 +116,9 @@ def check_for_required_columns(cpt_data: CPTData, filepath: str) -> None:
 
     Required columns taken from https://bedrock.engineer/reference/formats/gef/gef-cpt/#column-quantities
 
-    Args:
-        cpt_data (CPTData): The CPTData object to check.
-        filepath (str): The file path of the GEF file being processed.
-
-    Raises:
-        ValueError: If any required columns are missing.
+    :param cpt_data: CPTData, The CPTData object to check.
+    :param filepath: str, The file path of the GEF file being processed.
+    :raises: ValueError: If any required columns are missing.
     """
     required_columns = ["penetrationLength", "coneResistance"]
     if hasattr(cpt_data, "data"):
@@ -140,14 +131,11 @@ def get_gef_cpt_id(gef: CPTData) -> str:
     """
     Get a unique identifier for a CPTData object from alias (GEF-CPT) or bro_id (GEF-XML).
 
-    The "alias" property is populated for GEF-CPT format, from the CPT #TESTID header value.
+    - The "alias" property is populated for GEF-CPT format, from the CPT #TESTID header value.
+    - The "bro_id" property is populated for GEF-XML format, from the CPT broId element.
 
-    The "bro_id" property is populated for GEF-XML format, from the CPT broId element.
-
-    Args:
-        gef (CPTData): The CPTData object to get the identifier for.
-    Returns:
-        str: The unique identifier for the CPTData object.
+    :param gef: CPTData, the CPTData object to get the identifier for.
+    :return str: The unique identifier for the CPTData object.
     """
     if hasattr(gef, "bro_id") and gef.bro_id:
         return gef.bro_id
