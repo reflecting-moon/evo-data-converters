@@ -18,7 +18,16 @@ from python_ags4 import AGS4
 from typing import TYPE_CHECKING, Optional
 
 import evo.logging
-from evo.data_converters.common.objects.downhole_collection import DownholeCollection
+from evo.data_converters.common.objects.downhole_collection_from_evo import create_downhole_collection_from_evo
+
+# from evo.data_converters.common.objects.downhole_collection import (
+#     DownholeCollection as IntermediaryDownholeCollection,
+#     HoleCollars,
+#     ColumnMapping,
+#     MeasurementTableAdapter,
+#     MeasurementTableFactory,
+# )
+from evo.data_converters.common.objects.downhole_collection import DownholeCollection as EvoDownholeCollection
 from evo.data_converters.common.objects.downhole_collection.tables import DistanceTable
 from evo.data_converters.common import (
     EvoObjectMetadata,
@@ -44,7 +53,11 @@ class UnsupportedObjectError(AGSExporterException):
 logger = evo.logging.getLogger("data_converters")
 
 
-def _downhole_to_ags_groups(dhc: DownholeCollection) -> dict[DataFrame]:
+def _downhole_to_ags_groups(dhc: EvoDownholeCollection) -> dict[DataFrame]:
+    intermediary_object = create_downhole_collection_from_evo(dhc)
+    print(intermediary_object)
+    return {}
+
     # collars_df = dhc.collars.df
 
     for measurement in dhc.get_measurement_tables(filter=[DistanceTable]):
@@ -63,9 +76,10 @@ def _export_obj(
         raise UnsupportedObjectError(f"Unknown Geoscience Object schema '{evo_object['schema']}'")
 
     evo_object = object_class.from_dict(evo_object)
+    # intermediary_object = create_downhole_collection_from_evo(evo_object)
 
     match object_class:
-        case DownholeCollection():
+        case EvoDownholeCollection():
             return _downhole_to_ags_groups(evo_object)
         case _:
             raise UnsupportedObjectError(f"Cannot export {object_class} to AGS")
@@ -91,12 +105,6 @@ def export_ags(
     :raise UnsupportedObjectError: If the type of object is not supported.
     :raise MissingConnectionDetailsError: If no connections details could be derived.
     :raise ConflictingConnectionDetailsError: If both evo_workspace_metadata and service_manager_widget present.
-    """
-
-    """
-    Export a list of objects to an AGS file.
-
-    Q: Why a list of metadata, and not objects themselves?
     """
     service_client, data_client = create_evo_object_service_and_data_client(
         evo_workspace_metadata, service_manager_widget
