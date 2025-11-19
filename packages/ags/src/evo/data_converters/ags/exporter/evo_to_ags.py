@@ -10,26 +10,16 @@
 #  limitations under the License.
 
 import asyncio
-import dataclasses
-from typing import TYPE_CHECKING, Any, Optional
-from uuid import UUID
-
 import nest_asyncio
-import ags
-from ags import AGSMetadata
-from python_ags4 import AGS4
 
 from evo_schemas import schema_lookup
-from evo_schemas.objects import (
-    LineSegments_V2_0_0,
-    LineSegments_V2_1_0,
-    Pointset_V1_1_0,
-    Pointset_V1_2_0,
-    TriangleMesh_V2_0_0,
-    TriangleMesh_V2_1_0,
-)
+from pandas import DataFrame
+from python_ags4 import AGS4
+from typing import TYPE_CHECKING, Optional
 
 import evo.logging
+from evo.data_converters.common.objects.downhole_collection import DownholeCollection
+from evo.data_converters.common.objects.downhole_collection.tables import DistanceTable
 from evo.data_converters.common import (
     EvoObjectMetadata,
     EvoWorkspaceMetadata,
@@ -38,35 +28,82 @@ from evo.data_converters.common import (
 from evo.objects.client import ObjectAPIClient
 from evo.objects.data import ObjectSchema
 from evo.objects.utils.data import ObjectDataClient
-from pandas import Dataframe
 
 if TYPE_CHECKING:
     from evo.notebooks import ServiceManagerWidget
 
 
-def _map_to_ags_groups():
+class AGSExporterException(Exception):
     pass
 
-def _export_element(
-    object_metadata: EvoObjectMetadata,
+
+class UnsupportedObjectError(AGSExporterException):
+    pass
+
+
+logger = evo.logging.getLogger("data_converters")
+
+
+def _downhole_to_ags_groups(dhc: DownholeCollection) -> dict[DataFrame]:
+    # collars_df = dhc.collars.df
+
+    for measurement in dhc.get_measurement_tables(filter=[DistanceTable]):
+        pass
+
+
+def _export_obj(
+    obj_meta: EvoObjectMetadata,
     service_client: ObjectAPIClient,
     data_client: ObjectDataClient,
-) -> tuple[Dataframe, ObjectSchema]:
-    pass
+) -> DataFrame:
+    evo_object = asyncio.run(service_client.download_object_by_id(obj_meta.object_id, obj_meta.version_id)).as_dict()
+    object_class = schema_lookup.get(str(ObjectSchema.from_id(evo_object["schema"])))
+
+    if not object_class:
+        raise UnsupportedObjectError(f"Unknown Geoscience Object schema '{evo_object['schema']}'")
+
+    evo_object = object_class.from_dict(evo_object)
+
+    match object_class:
+        case DownholeCollection():
+            return _downhole_to_ags_groups(evo_object)
+        case _:
+            raise UnsupportedObjectError(f"Cannot export {object_class} to AGS")
+
 
 def export_ags(
     filepath: str,
     objects: list[EvoObjectMetadata],
-    ags_metadata: Optional[AGSMetadata] = None,
     evo_workspace_metadata: Optional[EvoWorkspaceMetadata] = None,
     service_manager_widget: Optional["ServiceManagerWidget"] = None,
 ) -> None:
+    """
+    Export a collection of Evo objects to an AGS file.
 
+    :param filepath: Path of the AGS file to create.
+    :param objects: List of EvoObjectMetadata objects containing the UUID and version of the Evo objects to export.
+    :param omf_metadata: Optional project metadata to embed in the OMF file.
+    :param evo_workspace_metadata: Optional Evo Workspace metadata.
+    :param service_manager_widget: Optional ServiceManagerWidget for use in notebooks.
+
+    One of evo_workspace_metadata or service_manager_widget is required.
+
+    :raise UnsupportedObjectError: If the type of object is not supported.
+    :raise MissingConnectionDetailsError: If no connections details could be derived.
+    :raise ConflictingConnectionDetailsError: If both evo_workspace_metadata and service_manager_widget present.
+    """
+
+    """
+    Export a list of objects to an AGS file.
+
+    Q: Why a list of metadata, and not objects themselves?
+    """
     service_client, data_client = create_evo_object_service_and_data_client(
         evo_workspace_metadata, service_manager_widget
     )
 
     nest_asyncio.apply()
 
-    ags_metadata = dataclasses.replace(ags_metadata) if ags_metadata else AGSMetadata()
-    
+    objs = [_export_obj(obj, service_client, data_client) for obj in objects]
+
+    return AGS4.dataframe_to_AGS4(objs, {}, filepath)
