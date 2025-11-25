@@ -12,9 +12,6 @@
 import asyncio
 import nest_asyncio
 
-from evo.data_converters.common.objects.downhole_collection_from_evo import create_downhole_collection_from_evo
-from evo.data_converters.common.objects.downhole_collection import DownholeCollection as EvoDownholeCollection
-from evo.data_converters.common.objects.downhole_collection.tables import DistanceTable
 from evo.data_converters.common import (
     EvoObjectMetadata,
     EvoWorkspaceMetadata,
@@ -26,9 +23,10 @@ from evo.objects.utils.data import ObjectDataClient
 from evo_schemas import schema_lookup
 from evo_schemas.objects import DownholeCollection_V1_3_1
 
-from pandas import DataFrame
 from python_ags4 import AGS4
 from typing import TYPE_CHECKING, Optional
+from uuid import UUID
+import pandas as pd
 
 import evo.logging
 
@@ -48,6 +46,10 @@ class AGSExporterException(Exception):
     pass
 
 
+class AgsFileInvalidException(Exception):
+    pass
+
+
 class UnsupportedObjectError(AGSExporterException):
     pass
 
@@ -55,38 +57,90 @@ class UnsupportedObjectError(AGSExporterException):
 logger = evo.logging.getLogger("data_converters")
 
 
-def _downhole_to_ags_groups(dhc: EvoDownholeCollection) -> dict[DataFrame]:
-    intermediary_object = create_downhole_collection_from_evo(dhc)
-    print(intermediary_object)
-    return {}
+def _downhole_to_ags_groups(
+    data_client: ObjectDataClient, object_id: UUID, object_version: Optional[str], dhc: DownholeCollection_V1_3_1
+) -> (pd.DataFrame, pd.DataFrame):
+    holes = asyncio.run(data_client.download_table(object_id, object_version, dhc.location.hole_id.table.as_dict()))
+    coords = asyncio.run(data_client.download_table(object_id, object_version, dhc.location.coordinates.as_dict()))
+    distance_collections = [c for c in dhc.collections if c.collection_type == "distance"]
+    measurements = [
+        (
+            asyncio.run(data_client.download_table(object_id, object_version, m.holes.as_dict())).to_pandas(),
+            asyncio.run(data_client.download_table(object_id, object_version, m.distance.values.as_dict())).to_pandas(),
+            {
+                attr.name: asyncio.run(
+                    data_client.download_table(object_id, object_version, attr.values.as_dict())
+                ).to_pandas()
+                for attr in m.distance.attributes
+            },
+        )
+        for m in distance_collections
+    ]
 
-    # collars_df = dhc.collars.df
+    hole_idx = holes.column("key")
+    hole_id = holes.column("value")
 
-    for measurement in dhc.get_measurement_tables(filter=[DistanceTable]):
-        pass
+    loca = pd.DataFrame(
+        {
+            "LOCA_ID": hole_id,
+            "LOCA_NATE": coords.column("x"),
+            "LOCA_NATN": coords.column("y"),
+            "LOCA_GL": coords.column("z"),
+        },
+        index=hole_idx,
+    )
+
+    hole_id = hole_id.to_pandas()
+    scpg = []
+    scpt = []
+
+    for holes, depth, data in measurements:
+        for hole_idx in range(hole_id.size):
+            for test_n in range(holes.at[hole_idx, "count"]):
+                entry_scpg = {"LOCA_ID": hole_id.at[hole_idx], "SCPG_TESN": test_n}
+                entry_scpt = {
+                    "LOCA_ID": hole_id.at[hole_idx],
+                    "SCPG_TESN": test_n,
+                    "SCPT_DPTH": depth.at[test_n, "values"],
+                }
+
+                for title, col in data.items():
+                    if title.startswith("SCPG") and title not in ["SCPG_TESN"]:
+                        entry_scpg[title] = col.at[test_n, "data"]
+                    elif title.startswith("SCPT") and title not in ["SCPT_DPTH"]:
+                        entry_scpt[title] = col.at[test_n, "data"]
+
+                scpg.append(pd.Series(entry_scpg))
+                scpt.append(pd.Series(entry_scpt))
+
+    scpg = pd.concat(scpg, axis=1).transpose()
+    scpt = pd.concat(scpt, axis=1).transpose()
+    tables = {"LOCA": loca.map(str), "SCPT": scpt.map(str), "SCPG": scpg.map(str)}
+    headings = {"LOCA": loca.columns.to_list(), "SCPT": scpt.columns.to_list(), "SCPG": scpg.columns.to_list()}
+
+    return (tables, headings)
 
 
 def _export_obj(
     obj_meta: EvoObjectMetadata,
     service_client: ObjectAPIClient,
     data_client: ObjectDataClient,
-) -> DataFrame:
+) -> (pd.DataFrame, pd.DataFrame):
     evo_object = asyncio.run(service_client.download_object_by_id(obj_meta.object_id, obj_meta.version_id)).as_dict()
-    object_class = schema_lookup.get(str(ObjectSchema.from_id(evo_object["schema"])))
+    schema = str(ObjectSchema.from_id(evo_object["schema"]))
+    object_class = schema_lookup.get(schema)
 
     if not object_class:
-        raise UnsupportedObjectError(f"Unknown Geoscience Object schema '{evo_object['schema']}'")
+        raise UnsupportedObjectError(f"Unknown Geoscience Object schema '{schema}'")
 
+    sub_classification = ObjectSchema.from_id(evo_object["schema"]).sub_classification
     evo_object = object_class.from_dict(evo_object)
-    # intermediary_object = create_downhole_collection_from_evo(evo_object)
 
-    match evo_object:
-        # @TODO Can we use DownholeCollection without version here?
-        case DownholeCollection_V1_3_1():
-            return _downhole_to_ags_groups(evo_object)
-
+    match sub_classification:
+        case "downhole-collection":
+            return _downhole_to_ags_groups(data_client, obj_meta.object_id, obj_meta.version_id, evo_object)
         case _:
-            raise UnsupportedObjectError(f"Cannot export {evo_object} to AGS")
+            raise UnsupportedObjectError(f"Cannot export {object_class} to AGS")
 
 
 def export_ags(
@@ -94,28 +148,13 @@ def export_ags(
     objects: list[EvoObjectMetadata],
     evo_workspace_metadata: Optional[EvoWorkspaceMetadata] = None,
     service_manager_widget: Optional["ServiceManagerWidget"] = None,
-) -> None:
-    """
-    Export a collection of Evo objects to an AGS file.
-
-    :param filepath: Path of the AGS file to create.
-    :param objects: List of EvoObjectMetadata objects containing the UUID and version of the Evo objects to export.
-    :param omf_metadata: Optional project metadata to embed in the OMF file.
-    :param evo_workspace_metadata: Optional Evo Workspace metadata.
-    :param service_manager_widget: Optional ServiceManagerWidget for use in notebooks.
-
-    One of evo_workspace_metadata or service_manager_widget is required.
-
-    :raise UnsupportedObjectError: If the type of object is not supported.
-    :raise MissingConnectionDetailsError: If no connections details could be derived.
-    :raise ConflictingConnectionDetailsError: If both evo_workspace_metadata and service_manager_widget present.
-    """
+):
     service_client, data_client = create_evo_object_service_and_data_client(
         evo_workspace_metadata, service_manager_widget
     )
 
     nest_asyncio.apply()
 
-    objs = [_export_obj(obj, service_client, data_client) for obj in objects]
+    tables, heading = _export_obj(objects[0], service_client, data_client)
 
-    return AGS4.dataframe_to_AGS4(objs, {}, filepath)
+    AGS4.dataframe_to_AGS4(tables, heading, filepath)
