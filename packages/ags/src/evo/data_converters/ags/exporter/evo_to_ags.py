@@ -12,21 +12,7 @@
 import asyncio
 import nest_asyncio
 
-from evo_schemas import schema_lookup
-from pandas import DataFrame
-from python_ags4 import AGS4
-from typing import TYPE_CHECKING, Optional
-
-import evo.logging
 from evo.data_converters.common.objects.downhole_collection_from_evo import create_downhole_collection_from_evo
-
-# from evo.data_converters.common.objects.downhole_collection import (
-#     DownholeCollection as IntermediaryDownholeCollection,
-#     HoleCollars,
-#     ColumnMapping,
-#     MeasurementTableAdapter,
-#     MeasurementTableFactory,
-# )
 from evo.data_converters.common.objects.downhole_collection import DownholeCollection as EvoDownholeCollection
 from evo.data_converters.common.objects.downhole_collection.tables import DistanceTable
 from evo.data_converters.common import (
@@ -37,6 +23,22 @@ from evo.data_converters.common import (
 from evo.objects.client import ObjectAPIClient
 from evo.objects.data import ObjectSchema
 from evo.objects.utils.data import ObjectDataClient
+from evo_schemas import schema_lookup
+from evo_schemas.objects import DownholeCollection_V1_3_1
+
+from pandas import DataFrame
+from python_ags4 import AGS4
+from typing import TYPE_CHECKING, Optional
+
+import evo.logging
+
+# from evo.data_converters.common.objects.downhole_collection import (
+#     DownholeCollection as IntermediaryDownholeCollection,
+#     HoleCollars,
+#     ColumnMapping,
+#     MeasurementTableAdapter,
+#     MeasurementTableFactory,
+# )
 
 if TYPE_CHECKING:
     from evo.notebooks import ServiceManagerWidget
@@ -78,11 +80,13 @@ def _export_obj(
     evo_object = object_class.from_dict(evo_object)
     # intermediary_object = create_downhole_collection_from_evo(evo_object)
 
-    match object_class:
-        case EvoDownholeCollection():
+    match evo_object:
+        # @TODO Can we use DownholeCollection without version here?
+        case DownholeCollection_V1_3_1():
             return _downhole_to_ags_groups(evo_object)
+
         case _:
-            raise UnsupportedObjectError(f"Cannot export {object_class} to AGS")
+            raise UnsupportedObjectError(f"Cannot export {evo_object} to AGS")
 
 
 def export_ags(
