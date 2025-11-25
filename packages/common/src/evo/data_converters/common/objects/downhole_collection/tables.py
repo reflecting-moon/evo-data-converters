@@ -15,6 +15,7 @@ import typing
 from abc import ABC, abstractmethod
 
 from .column_mapping import ColumnMapping
+from ..attributes import HasAttributesMixin, AttributeNanValuesMappingType
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -22,7 +23,7 @@ else:
     from typing_extensions import override
 
 
-class MeasurementTableAdapter(ABC):
+class MeasurementTableAdapter(ABC, HasAttributesMixin):
     """
     Abstract base class for different measurement table types.
 
@@ -32,11 +33,14 @@ class MeasurementTableAdapter(ABC):
     NaN value tracking.
     """
 
+    df: pd.DataFrame
+    mapping: ColumnMapping
+
     def __init__(
         self,
         df: pd.DataFrame,
         column_mapping: ColumnMapping,
-        nan_values_by_column: dict[str, list[typing.Any]] | None = None,
+        nan_values_by_column: AttributeNanValuesMappingType | None = None,
     ) -> None:
         """
         Initialise the measurement table adapter.
@@ -47,7 +51,7 @@ class MeasurementTableAdapter(ABC):
         """
         self.df: pd.DataFrame = df
         self.mapping: ColumnMapping = column_mapping
-        self.nan_values_by_column: dict[str, list[typing.Any]] = nan_values_by_column or {}
+        self.nan_values_by_column = nan_values_by_column or {}
         self._validate()
         self._prepare_dataframe()
 
