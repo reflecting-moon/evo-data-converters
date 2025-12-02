@@ -113,24 +113,16 @@ def _downhole_to_ags_groups(
                 scpg.append(pd.Series(entry_scpg))
                 scpt.append(pd.Series(entry_scpt))
 
-    scpg = pd.concat(scpg, axis=1).transpose()
-    scpt = pd.concat(scpt, axis=1).transpose()
-
     proj = pd.DataFrame(
         {
             "PROJ_ID": [dhc.uuid],
             "PROJ_NAME": [dhc.name],
-            "PROJ_AGS": ["4.0.4"],
-            "PROJ_DATE": [pd.Timestamp.now().strftime("%d/%m/%Y")],
+            "PROJ_MEMO": [f"Exported from Seequent Evo {pd.Timestamp.now().strftime('%Y-%m-%d')}"],
         }
     )
-
-    tables = {
-        "PROJ": proj.map(str),
-        "LOCA": loca.map(str),
-        "SCPT": scpt.map(str),
-        "SCPG": scpg.map(str)
-    }
+    scpg = pd.concat(scpg, axis=1).transpose()
+    scpt = pd.concat(scpt, axis=1).transpose()
+    tables = {"PROJ": proj.map(str), "LOCA": loca.map(str), "SCPT": scpt.map(str), "SCPG": scpg.map(str)}
     headings = {
         "PROJ": proj.columns.to_list(),
         "LOCA": loca.columns.to_list(),
