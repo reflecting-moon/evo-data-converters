@@ -115,8 +115,28 @@ def _downhole_to_ags_groups(
 
     scpg = pd.concat(scpg, axis=1).transpose()
     scpt = pd.concat(scpt, axis=1).transpose()
-    tables = {"LOCA": loca.map(str), "SCPT": scpt.map(str), "SCPG": scpg.map(str)}
-    headings = {"LOCA": loca.columns.to_list(), "SCPT": scpt.columns.to_list(), "SCPG": scpg.columns.to_list()}
+
+    proj = pd.DataFrame(
+        {
+            "PROJ_ID": [dhc.uuid],
+            "PROJ_NAME": [dhc.name],
+            "PROJ_AGS": ["4.0.4"],
+            "PROJ_DATE": [pd.Timestamp.now().strftime("%d/%m/%Y")],
+        }
+    )
+
+    tables = {
+        "PROJ": proj.map(str),
+        "LOCA": loca.map(str),
+        "SCPT": scpt.map(str),
+        "SCPG": scpg.map(str)
+    }
+    headings = {
+        "PROJ": proj.columns.to_list(),
+        "LOCA": loca.columns.to_list(),
+        "SCPT": scpt.columns.to_list(),
+        "SCPG": scpg.columns.to_list(),
+    }
 
     return (tables, headings)
 
